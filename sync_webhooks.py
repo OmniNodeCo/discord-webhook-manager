@@ -5,8 +5,6 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-import yaml
-
 
 GITHUB_API = "https://api.github.com"
 
@@ -16,11 +14,11 @@ OWNER = os.environ["GITHUB_OWNER"]
 
 
 # ---------------------------------------------------------
-# Load config.yml
+# Load config.json
 # ---------------------------------------------------------
 
-with open("config.yml", "r", encoding="utf-8") as file:
-    config = yaml.safe_load(file) or {}
+with open("config.json", "r", encoding="utf-8") as file:
+    config = json.load(file)
 
 
 EXCLUDED_REPOS = set(
@@ -37,11 +35,7 @@ EVENTS = config.get(
 # GitHub API
 # ---------------------------------------------------------
 
-def github_request(
-    url,
-    method="GET",
-    data=None,
-):
+def github_request(url, method="GET", data=None):
     headers = {
         "Accept": "application/vnd.github+json",
         "Authorization": f"Bearer {GITHUB_TOKEN}",
@@ -76,20 +70,20 @@ def github_request(
     except urllib.error.HTTPError as error:
         error_body = error.read().decode(
             "utf-8",
-            errors="replace",
+            errors="replace"
         )
 
         print(
-            f"GitHub API error {error.code}: {error_body}",
-            file=sys.stderr,
+            f"[GitHub API {error.code}] {error_body}",
+            file=sys.stderr
         )
 
         return None
 
     except urllib.error.URLError as error:
         print(
-            f"Network error: {error}",
-            file=sys.stderr,
+            f"[Network error] {error}",
+            file=sys.stderr
         )
 
         return None
@@ -111,9 +105,7 @@ def get_repositories():
             "sort": "full_name",
         })
 
-        url = (
-            f"{GITHUB_API}/user/repos?{params}"
-        )
+        url = f"{GITHUB_API}/user/repos?{params}"
 
         result = github_request(url)
 
@@ -146,10 +138,7 @@ def get_hooks(repo):
 
     result = github_request(url)
 
-    if result is None:
-        return []
-
-    return result
+    return result or []
 
 
 # ---------------------------------------------------------
@@ -158,11 +147,11 @@ def get_hooks(repo):
 
 def find_discord_hook(hooks):
     for hook in hooks:
-        config = hook.get("config", {})
+        hook_config = hook.get("config", {})
 
         if (
             hook.get("name") == "web"
-            and config.get("url") == DISCORD_WEBHOOK
+            and hook_config.get("url") == DISCORD_WEBHOOK
         ):
             return hook
 
@@ -185,14 +174,14 @@ def create_webhook(repo):
         "events": EVENTS,
         "config": {
             "url": DISCORD_WEBHOOK,
-            "content_type": "json",
-        },
+            "content_type": "json"
+        }
     }
 
     result = github_request(
         url,
         method="POST",
-        data=payload,
+        data=payload
     )
 
     return result is not None
@@ -215,14 +204,14 @@ def update_webhook(repo, hook):
         "events": EVENTS,
         "config": {
             "url": DISCORD_WEBHOOK,
-            "content_type": "json",
-        },
+            "content_type": "json"
+        }
     }
 
     result = github_request(
         url,
         method="PATCH",
-        data=payload,
+        data=payload
     )
 
     return result is not None
@@ -247,7 +236,7 @@ def process_repository(repo):
         if create_webhook(repo):
             print(f"[ADDED] {repo}")
         else:
-            print(f"[FAILED] Could not add webhook to {repo}")
+            print(f"[FAILED] {repo}")
 
         return
 
@@ -257,9 +246,14 @@ def process_repository(repo):
 
     desired_events = set(EVENTS)
 
+    is_active = existing_hook.get(
+        "active",
+        False
+    )
+
     if (
         existing_events == desired_events
-        and existing_hook.get("active") is True
+        and is_active
     ):
         print(f"[OK] {repo}")
         return
@@ -269,7 +263,7 @@ def process_repository(repo):
     if update_webhook(repo, existing_hook):
         print(f"[UPDATED] {repo}")
     else:
-        print(f"[FAILED] Could not update {repo}")
+        print(f"[FAILED UPDATE] {repo}")
 
 
 # ---------------------------------------------------------
@@ -284,17 +278,15 @@ def main():
     print()
 
     print(f"Owner: {OWNER}")
-    print(
-        "Events:",
-        ", ".join(EVENTS),
-    )
+    print(f"Events: {', '.join(EVENTS)}")
 
-    print(
-        "Excluded:",
-        ", ".join(EXCLUDED_REPOS)
-        if EXCLUDED_REPOS
-        else "none",
-    )
+    if EXCLUDED_REPOS:
+        print(
+            "Excluded: "
+            + ", ".join(sorted(EXCLUDED_REPOS))
+        )
+    else:
+        print("Excluded: none")
 
     print()
 
