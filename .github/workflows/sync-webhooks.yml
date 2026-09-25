@@ -1,0 +1,62 @@
+name: Sync Discord Webhooks
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    # Every 6 hours
+    - cron: "0 */6 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout manager
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Read configuration
+        id: config
+        run: |
+          python - <<'PY'
+          import os
+          import yaml
+
+          with open("config.yml", "r") as f:
+              config = yaml.safe_load(f)
+
+          excluded = config.get("excluded_repos", [])
+          events = config.get("events", ["push", "pull_request"])
+
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(
+                  "EXCLUDED_REPOS="
+                  + ",".join(excluded)
+                  + "\n"
+              )
+
+              f.write(
+                  "WEBHOOK_EVENTS="
+                  + ",".join(events)
+                  + "\n"
+              )
+          PY
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Sync Discord webhooks
+        env:
+          GITHUB_TOKEN: ${{ secrets.WEBHOOK_GITHUB_TOKEN }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          GITHUB_OWNER: ${{ github.repository_owner }}
+        run: |
+          python sync_webhooks.py
