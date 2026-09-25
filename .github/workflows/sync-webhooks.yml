@@ -1,62 +1,38 @@
 name: Sync Discord Webhooks
 
 on:
+  # Run manually from the Actions tab
   workflow_dispatch:
 
+  # Run automatically every 6 hours
   schedule:
-    # Every 6 hours
     - cron: "0 */6 * * *"
 
+# The workflow itself only needs to read this repository.
+# The separate WEBHOOK_GITHUB_TOKEN handles webhook management.
 permissions:
   contents: read
 
 jobs:
   sync:
+    name: Sync Discord Webhooks
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout manager
+      # Download the repository files
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
-
-      - name: Read configuration
-        id: config
-        run: |
-          python - <<'PY'
-          import os
-          import yaml
-
-          with open("config.yml", "r") as f:
-              config = yaml.safe_load(f)
-
-          excluded = config.get("excluded_repos", [])
-          events = config.get("events", ["push", "pull_request"])
-
-          with open(os.environ["GITHUB_ENV"], "a") as f:
-              f.write(
-                  "EXCLUDED_REPOS="
-                  + ",".join(excluded)
-                  + "\n"
-              )
-
-              f.write(
-                  "WEBHOOK_EVENTS="
-                  + ",".join(events)
-                  + "\n"
-              )
-          PY
-
-      - name: Install dependencies
-        run: pip install pyyaml
-
-      - name: Sync Discord webhooks
+      # Run the webhook manager
+      - name: Sync webhooks
         env:
+          # Fine-grained GitHub PAT stored in repository secrets
           GITHUB_TOKEN: ${{ secrets.WEBHOOK_GITHUB_TOKEN }}
+
+          # Discord webhook URL stored in repository secrets
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+
+          # Automatically gets the owner of this repository
           GITHUB_OWNER: ${{ github.repository_owner }}
         run: |
-          python sync_webhooks.py
+          python3 sync_webhooks.py
