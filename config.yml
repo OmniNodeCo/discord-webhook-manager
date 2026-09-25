@@ -1,8 +1,0 @@
-# Repositories that should NEVER receive the Discord webhook.
-excluded_repos:
-  - OmniNodeCo
-  - discord-webhook-manager
-# GitHub events that Discord should receive.
-events:
-  - push
-  - pull_request

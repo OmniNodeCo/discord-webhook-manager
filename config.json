@@ -1,0 +1,10 @@
+{
+  "excluded_repos": [
+    "discord-webhook-manager",
+    "OmniNodeCo"
+  ],
+  "events": [
+    "push",
+    "pull_request"
+  ]
+}
